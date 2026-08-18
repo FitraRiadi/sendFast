@@ -1,8 +1,10 @@
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import api from './services/Api.jsx'
 
 const MAX_SELECTED = 5
+const CONTACTS_KEY = 'sendmessage.contacts'
+const REQUESTS_KEY = 'sendmessage.requests'
 
 const COUNTRY_CODES = [
   { code: '+62', label: 'Indonesia' },
@@ -18,12 +20,23 @@ const COUNTRY_CODES = [
 const INITIAL_CONTACTS = [
   { id: 1, name: 'Eja Ganteng', phone: '6281572760056' },
   { id: 2, name: 'Ajin', phone: '62895324817406' },
-  { id: 4, name: 'Fathan', phone: '6288294783726' },
+  { id: 3, name: 'Fathan', phone: '6288294783726' },
+  { id: 4, name: 'Suki Liar', phone: '62895344262060' },
 ]
+
+
+
 
 export default function App(){
   const [message, setMessage] = useState('')
-  const [contacts, setContacts] = useState(INITIAL_CONTACTS)
+  const [contacts, setContacts] = useState(() => {
+    try {
+      const saved = localStorage.getItem(CONTACTS_KEY)
+      return saved ? JSON.parse(saved) : INITIAL_CONTACTS
+    } catch {
+      return INITIAL_CONTACTS
+    }
+  })
   const [selected, setSelected] = useState([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [newName, setNewName] = useState('')
@@ -31,6 +44,22 @@ export default function App(){
   const [newNumber, setNewNumber] = useState('')
   const [sending, setSending] = useState(false)
   const [results, setResults] = useState([])
+  const [totalRequests, setTotalRequests] = useState(() => {
+    try {
+      const saved = localStorage.getItem(REQUESTS_KEY)
+      return saved ? parseInt(saved, 10) || 0 : 0
+    } catch {
+      return 0
+    }
+  })
+
+  useEffect(() => {
+    localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts))
+  }, [contacts])
+
+  useEffect(() => {
+    localStorage.setItem(REQUESTS_KEY, JSON.stringify(totalRequests))
+  }, [totalRequests])
 
   function toggleContact(id){
     if (selected.includes(id)) {
@@ -57,6 +86,7 @@ export default function App(){
   function deleteContact(id){
     setContacts(prev => prev.filter(c => c.id !== id))
     setSelected(prev => prev.filter(c => c !== id))
+
   }
 
   async function sendMessage(){
@@ -71,11 +101,13 @@ export default function App(){
         message: message.trim(),
       })
       setResults(res.data.results ?? [])
+      const successCount = (res.data.results ?? []).filter(r => r.status === 'success').length
+      setTotalRequests(prev => prev + successCount)
     } catch (err) {
       const errors = err.response?.data?.errors
       const detail = errors
         ? Object.values(errors).flat().join(' • ')
-        : 'Gagal terhubung ke server. Pastikan backend berjalan.'
+        : 'Failed connect to server.'
       setResults([{ to: '', status: 'error', error: detail }])
     } finally {
       setSending(false)
@@ -100,22 +132,32 @@ export default function App(){
       <div className="row mt-5 mb-5">
 
         <div className="col-md-8">
-          <h1 style={{fontWeight:"800",fontSize:"70px"}}>Send <span className="text-warning">WhatsApp</span></h1>
-          <p>Send WhatsApp Message Faster</p>
+          <h1 style={{fontWeight:"800",fontSize:"80px",width:"350px"}}>Send <span className="text-warning"><br />WhatsApp</span></h1>
+          <p>Send WhatsApp Message Faster Via Fonnte</p>
           {/* <button className="btn btn-outline-light w-25">Start Message</button> */}
         </div>
         
-        <div className="col-md-4 text-center bg-warning rounded-5">
-          <i className="bi bi-whatsapp" style={{fontWeight:"800",fontSize:"150px"}}></i>
+        <div className="col-md-4 text-center bg-warning d-flex align-items-center justify-content-center rounded-5 ">
+          <i className="bi bi-whatsapp " style={{fontWeight:"800",fontSize:"150px"}}></i>
         </div>
 
         <div className="col-md-12">
           <hr />
         </div>
 
+        <div className="col-md-12  p-2 text-center text-dark d-flex justify-content-center" >
+          <div className='bg-warning p-2 shadow-lg w-50 rounded-5'>
+            <i className='bi bi-coin me-2'></i>Total Request - {totalRequests}
+          </div>
+        </div>
+
       </div>
 
     </div>
+
+
+   
+
 
     {/* Content */}
     <div className="container bg-light shadow-lg mt-4 rounded-4 mb-5 p-4 " style={{border:"1px solid #05050550"}}>
@@ -129,6 +171,7 @@ export default function App(){
             className="form-control bg-secondary-subtle"
             rows="12"
             placeholder="Type your message.."
+            style={{fontFamily:"initial"}}
             value={message}
             onChange={e => setMessage(e.target.value)}
           ></textarea>
@@ -136,6 +179,7 @@ export default function App(){
           <button
             type="button"
             className="btn btn-primary w-100 mt-3 fw-bold"
+            style={{cursor:"loading"}}
             disabled={!message.trim() || selected.length === 0 || sending}
             onClick={sendMessage}
           >
@@ -163,9 +207,9 @@ export default function App(){
                 >
                   <i className={`bi ${result.status === 'success' ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}`}></i>
                   <div>
-                    {result.to && <span className="fw-bold">{result.to}</span>}
+                    {result.to && <span className="fw-bold">+{result.to}</span>}
                     {result.to && <span className="mx-1">-</span>}
-                    {result.status === 'success' ? 'Terkirim' : result.error}
+                    {result.status === 'success' ? 'Sending Success' : result.error}
                   </div>
                 </div>
               ))}
@@ -247,7 +291,7 @@ export default function App(){
                       <div className="d-flex flex-column">
                         <span className="fw-bold">{contact.name}</span>
                         <small className={isSelected ? '' : 'text-secondary'}>
-                          <i className='bi bi-telephone me-2'></i>{contact.phone}
+                          <i className='bi bi-telephone me-2'></i>+{contact.phone}
                         </small>
                       </div>
                     </div>
